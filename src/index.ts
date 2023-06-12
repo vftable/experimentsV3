@@ -32,14 +32,22 @@ interface RolloutRegistrar {
   buckets: number[];
 }
 
+interface RolloutRegistryResponse {
+  data: RolloutRegistrar[];
+}
+
 (async () => {
-  const rolloutRegistry: RolloutRegistrar[] = await axios.get(
+  const response: RolloutRegistryResponse = await axios.get(
     config.EXPERIMENT_REGISTRY_URL
   );
 
+  const rolloutRegistry: RolloutRegistrar[] = response.data;
+
   const userExperimentAverages: UserExperiment[][] = [];
 
-  for (let i = 0; i < config.EXPERIMENT_ROLLOUT_RANGE; i++) {
+  const rolloutRange: number = config.DEBUG ? config.DEBUG_EXPERIMENT_ROLLOUT_RANGE : config.EXPERIMENT_ROLLOUT_RANGE;
+
+  for (let i = 0; i < rolloutRange; i++) {
     try {
       await new Promise((r) => setTimeout(r, 500));
 
@@ -64,10 +72,16 @@ interface RolloutRegistrar {
       );
 
       userExperimentAverages.push(userExperiments);
+
+      if (config.DEBUG) {
+        console.log(`[!] run ${i + 1}/${rolloutRange}`);
+      }
     } catch (error) {
-      console.log(`[!] oh no!`);
+      console.log(`[!] oh no!\n${error}\n`);
     }
   }
+
+  console.log();
 
   const uniqueExperimentIdentifiers: string[] = [
     ...new Set(
@@ -95,16 +109,16 @@ interface RolloutRegistrar {
       );
 
       const eligibilityPercentageRaw: number =
-        (eligibilityAverage.length / config.EXPERIMENT_ROLLOUT_RANGE) * 100;
+        (eligibilityAverage.length / rolloutRange) * 100;
 
       const eligibilityPercentage: number =
-        Math.ceil(eligibilityPercentageRaw / 5) * 5;
+        Math.round(eligibilityPercentageRaw / 5) * 5;
 
       console.log(
         `[*] experiment ${experimentIdentifier} - rollout percentage for bucket ${bucket} (${experimentRollout.description[bucket]}): ${eligibilityPercentage}%`
       );
     });
-    
+
     console.log();
   }
 })();
